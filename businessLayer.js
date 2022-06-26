@@ -1,74 +1,61 @@
-var businessLayer = {}
+var cityCoordinate = require('./cityCoordinate')
+var cityWeather = require('./cityWeather')
 
-businessLayer.pipe = async (memoryObj, searchRequest, https, settings) => {
+businessLayer = (settings,  memoryObj, cityCoordAndWeather) => { 
 
-    var outResp = {}
-    var outData = {}
-    var ErrorData = {}
-    var inMemoryData = businessLayer.getDataFromInMemoryObj(memoryObj, searchRequest, settings)
-    outData = inMemoryData.data
-      // console.log(`inmemoryQQQ`, inMemoryData)
-      console.log(`Inmemory Date`, inMemoryData['data']['date'], (new Date).getTime(), (new Date).getTime() - inMemoryData['data']['date'] )
-    if(inMemoryData.status === 'noEntry' || inMemoryData.status === 'entryExpired') {
-        console.log(`call APi`)//, inMemoryData.status)//, inMemoryData)
-        var APIData = await businessLayer.getDataFromGithub(searchRequest, https, settings)
+   return {
+    async pipe(searchRequest){
 
-       // console.log(`api`, APIData)
-        APIData.status === 'ok' ? businessLayer.writeDataToInMemoryObj(memoryObj,  searchRequest, APIData) 
-                                : ''
+      var outResp = {}
+      var outData = {} 
+      var ErrorData = {}
 
-       outData = APIData.status === 'ok' ? APIData : ErrorData                               
-    }
-    //console.log(`pipe out data\n`, outData)
-    return ({...outResp, ...outData})
-}
+      var cityCoord = await this.getCityCoord(cityCoordAndWeather, searchRequest)
+      var cityName = searchRequest
+       console.log(`cityCoord`, cityCoord)
+      var currentWeather = await this.getCurrentWeather(cityCoordAndWeather, cityCoord, cityName)
+      console.log(`currentWeather`, currentWeather)
+      var forecast = await this.getForecast(cityCoordAndWeather, cityCoord, cityName)
+      console.log(`forecast`, forecast)
+        //outData = cityCoord.status === 'ok' ? cityCoord : ErrorData                               
+      //console.log(`pipe out data\n`, outData)
+     var {lat, lon} = cityCoord
+      outData = {city: searchRequest, coords: {lat, lon}, weather: {currentWeather, forecast}}
+      return ({...outResp, ...outData})
+  },
 
-businessLayer.getDataFromInMemoryObj = (memoryObj, searchRequest, settings) => {
-    //console.log(`from inmemory`, memoryObj, searchRequest)
-    var data = memoryObj.get(searchRequest, settings.cacheRecordLifeTime)
-    return data
-}    
-businessLayer.getDataFromGithub = async (searchRequest, https, settings) => {
-  console.log(`get from api`, searchRequest)
-  //https://www.thecocktaildb.com/api/json/v1/1/search.php?s=margarita
-    const options = {
-        hostname: `thecocktaildb.com`,//settings.apiLink.hostname,
-        port: settings.apiLink.port,
-        path: `/api/json/v1/1/search.php?s=${searchRequest}`,//`${settings.apiLink.path}/${searchRequest}`,
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': data.length
-        },
-      };
+  async getCityCoord(cityCoordAndWeather, cityName){
 
-      console.log(`PATH \n`, options.hostname, options.path)
+      var cityCoord = await cityCoordinate(settings, cityCoordAndWeather, memoryObj.cityMemoryObj).get(cityName)
+      console.log(`CityCoord`, cityCoord)
+      var {lon, lat} = cityCoord.data
+      console.log(`coord`, lon, lat, cityCoord)
 
-    return new Promise((resolve, reject) => {
-        const req = https.request(options, (res) => {
-          
-          var responseBody = '';
-    
-          res.on('data', (chunk) => {
-            responseBody += chunk;
-          });
-    
-          res.on('end', () => {
-            resolve({status: 'ok', data: responseBody});
-          });
-        });
-    
-        req.on('error', (err) => {
-          reject(err);
-        });
-    
-       // req.write(data)
-        req.end();
-      });
-}
+      return {lon, lat}
+        /* console.log(`get coord by cityname`, cityName, cityCoordAndWeather)
+          var coord = cityCoordAndWeather.getCoord(cityName)
+        return coord*/
+ },
 
-businessLayer.writeDataToInMemoryObj = (memoryObj, searchRequest, data) => {
-    memoryObj.put({[searchRequest]: {date: (new Date).getTime(), answer: data}})
+ async getCurrentWeather(cityCoordAndWeather, cityCoord, cityName){
+      var cityCurrentWeather = await cityWeather(settings, cityCoordAndWeather, memoryObj.weatherMemoryObj).getCurrentWeather(cityCoord, cityName)
+          console.log(`weather`, cityCurrentWeather)//, data[0].lon, data[0].lat)
+
+      /* console.log(`get weather by citycoord`, cityCoord, cityCoordAndWeather)
+        var currentWeather = cityCoordAndWeather.getCurrentWeather(cityCoord)
+        return currentWeather*/
+        return cityCurrentWeather
+  },
+
+  async getForecast(cityCoordAndWeather, cityCoord, cityName){
+        console.log(`get weather forecast by citycoord`, cityCoord, cityCoordAndWeather)
+        /* var forecast = cityCoordAndWeather.getForecast(cityCoord)
+        return forecast*/
+        var cityForecast = await cityWeather(settings, cityCoordAndWeather, memoryObj.weatherMemoryObj).getForecast(cityCoord, cityName)    
+        console.log(`weather forecast`, cityForecast)
+        return cityForecast
+      }
+  }
 }
 
 module.exports = businessLayer

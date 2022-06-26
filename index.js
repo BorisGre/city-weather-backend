@@ -4,11 +4,13 @@ const endpoints = require('./endpoints');
 const dtoTemplate = require('./dtoTemplate')
 var settings = require('./settings')
 //var router 
-var memoryObj = require('./memoryObj');
+var cityMemoryObj = require('./cityMemoryObj')();
+var weatherMemoryObj = require('./weatherMemoryObj')(settings)
 var mainLayer = require('./mainLayer/mainLayer');
-var businessLayer = require('./businessLayer');
 
-memoryObj = memoryObj(settings)
+var cityCoordAndWeather = require("./cityCoordAndWeather")(https, settings)
+var businessLayer = require('./businessLayer')(settings, {cityMemoryObj, weatherMemoryObj}, cityCoordAndWeather);
+
 
 http.createServer(async function (request, response) {
         // if(request'/favicon.ico', response.statusCode(204))
@@ -32,7 +34,7 @@ http.createServer(async function (request, response) {
          }*/
          //const route = await router(parsedEndpointDto, dtoTemplate, request)
          const searchRequest = await mainLayer.checkEndPoint(parsedEndpointDto, dtoTemplate, endpoints, request)
-         outData = await businessLayer.pipe(memoryObj, searchRequest, https, settings)
+         outData = await businessLayer.pipe(searchRequest, cityCoordAndWeather)
                 
                 /*.then(checkedAuthObj => mainLayer.parse(checkedAuthObj, request, dtoTemplate))
                 .then(parsedEndpointDto => mainLayer.checkEndPoint(parsedEndpointDto, dtoTemplate, endpoints, request))
@@ -52,6 +54,9 @@ http.createServer(async function (request, response) {
                 response.writeHead(200, { 'Content-Type': 'application/json' });
                 //console.log(`outData\n`, outData)
                 response.write(JSON.stringify(outData))
+                console.log(`WEATHER memObj`, JSON.stringify(weatherMemoryObj))
+               // console.log(JSON.stringify(cityMemoryObj), JSON.stringify(weatherMemoryObj))
+               // console.log(cityMemoryObj, weatherMemoryObj)
                  response.end()
                } catch(e) {
                   console.log(`EXCEPTION`, e)
